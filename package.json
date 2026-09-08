@@ -1,0 +1,15 @@
+{
+  "name": "omp-cognitive-modes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Modos cognitivos /pensar e /boost para Oh My Pi",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.1",
+    "@sinclair/typebox": "0.34.52",
+    "typescript": "^5.0.0"
+  }
+}
