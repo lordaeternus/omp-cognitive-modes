@@ -2,7 +2,7 @@
   "name": "omp-cognitive-modes",
   "version": "1.0.0",
   "private": true,
-  "description": "Cognitive /pensar and /boost modes for Oh My Pi",
+  "description": "Cognitive /intellect and /boost modes for Oh My Pi",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit"

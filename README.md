@@ -2,12 +2,10 @@
 
 An extension for [Oh My Pi](https://github.com/can1357/oh-my-pi) that adds two independent cognitive modes to the agent:
 
-- `🧠 Pensar [Ativo]`: increases reasoning effort and applies lightweight reflection, evidence gathering, and final-review discipline.
-- `🚀 Boost [Ativo]`: structures complex work into investigation, planning, execution, and verification.
+- `🧠 Intellect [Active]`: increases reasoning effort and applies lightweight reflection, evidence gathering, and final-review discipline.
+- `🚀 Boost [Active]`: structures complex work into investigation, planning, execution, and verification.
 
 Both modes can remain active at the same time. Turning one mode on or off does not affect the other.
-
-> The command names and status labels remain in Portuguese because they are part of the extension's interface.
 
 ## Requirements
 
@@ -16,20 +14,20 @@ Both modes can remain active at the same time. Turning one mode on or off does n
 
 ## Installation
 
-Copy `pensar.ts` to OMP's global extensions directory:
+Copy `intellect.ts` to OMP's global extensions directory:
 
 ### Windows
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.omp\agent\extensions"
-Copy-Item .\pensar.ts "$HOME\.omp\agent\extensions\pensar.ts"
+Copy-Item .\intellect.ts "$HOME\.omp\agent\extensions\intellect.ts"
 ```
 
 ### Linux and macOS
 
 ```bash
 mkdir -p ~/.omp/agent/extensions
-cp pensar.ts ~/.omp/agent/extensions/pensar.ts
+cp intellect.ts ~/.omp/agent/extensions/intellect.ts
 ```
 
 If OMP is already running, execute `/reload` or restart it.
@@ -37,17 +35,17 @@ If OMP is already running, execute `/reload` or restart it.
 You can also load the extension directly:
 
 ```bash
-omp -e ./pensar.ts
+omp -e ./intellect.ts
 ```
 
 ## Usage
 
-### Pensar
+### Intellect
 
-Enter `/pensar` to toggle the mode:
+Enter `/intellect` to toggle the mode:
 
 ```text
-/pensar
+/intellect
 ```
 
 While active, the agent:
@@ -60,9 +58,9 @@ While active, the agent:
 The command also supports explicit state changes and one-off tasks:
 
 ```text
-/pensar on
-/pensar off
-/pensar investigate and fix this error
+/intellect on
+/intellect off
+/intellect investigate and fix this error
 ```
 
 With native reasoning models, it selects the highest supported reasoning level. With other models, it enables the structured `think` tool.
@@ -93,11 +91,11 @@ The command also supports explicit state changes and one-off tasks:
 ### Using both modes
 
 ```text
-/pensar
+/intellect
 /boost
 ```
 
-The status bar displays both indicators. In this state, Pensar improves the reasoning process while Boost structures execution.
+The status bar displays both indicators. In this state, Intellect improves the reasoning process while Boost structures execution.
 
 ## Safety
 
@@ -112,4 +110,4 @@ npm install
 npm run typecheck
 ```
 
-Both commands live in `pensar.ts` because they share cognitive state, model integration, and mutation guardrails.
+Both commands live in `intellect.ts` because they share cognitive state, model integration, and mutation guardrails.

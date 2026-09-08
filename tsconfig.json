@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "files": ["pensar.ts"]
+  "files": ["intellect.ts"]
 }

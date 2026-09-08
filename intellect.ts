@@ -29,7 +29,7 @@ export interface SessionBeforeCompactResult {
 /** Schema for the structured scratchpad `think` tool */
 export const ThinkParams = Type.Object({
   thought: Type.String({
-    description: "Raciocínio reflexivo, análise crítica da situação, premissas e planejamento passo a passo."
+    description: "Reflective reasoning, critical analysis, assumptions, and step-by-step planning."
   }),
   stage: Type.Optional(Type.Union([
     Type.Literal("investigation"),
@@ -37,19 +37,19 @@ export const ThinkParams = Type.Object({
     Type.Literal("verification"),
     Type.Literal("reflection")
   ], {
-    description: "Fase do raciocínio: investigation (investigação), planning (planejamento), verification (verificação), reflection (reflexão)."
+    description: "Reasoning stage: investigation, planning, verification, or reflection."
   })),
   hypotheses: Type.Optional(Type.Array(Type.String(), {
-    description: "Hipóteses formuladas sobre causas, comportamento ou arquitetura."
+    description: "Hypotheses about causes, behavior, or architecture."
   })),
   premises: Type.Optional(Type.Array(Type.String(), {
-    description: "Premissas e restrições assumidas para a solução."
+    description: "Assumptions and constraints adopted for the solution."
   })),
   verificationPlan: Type.Optional(Type.String({
-    description: "Critérios e plano de validação e testes antes de qualquer mutação ou conclusão."
+    description: "Verification criteria and test plan required before mutation or conclusion."
   }))
 }, {
-  description: "Ferramenta de scratchpad cognitivo estruturado para planejamento e raciocínio profundo."
+  description: "Structured cognitive scratchpad for planning and deep reasoning."
 });
 
 export interface ThoughtEntry {
@@ -61,7 +61,7 @@ export interface ThoughtEntry {
   timestamp: number;
 }
 
-export interface PensarState {
+export interface IntellectState {
   active: boolean;
   boostActive: boolean;
   singleShot: boolean;
@@ -767,45 +767,44 @@ export function isExistingFile(targetPath: string, cwd?: string, ctx?: any): boo
 /** Builds structured 4-stage orchestration prompt for /boost commands */
 export function buildBoostPrompt(task: string): string {
   return [
-    "[PROTOCOLO DE ORQUESTRAÇÃO ESTRUTURADA - BOOST]",
-    "Execute a tarefa a seguir com excelência de engenharia de software, aplicando rigorosamente o protocolo em 4 etapas:",
+    "[STRUCTURED ORCHESTRATION PROTOCOL - BOOST]",
+    "Execute the following task with software engineering excellence, rigorously following this four-stage protocol:",
     "",
-    "1. ETAPA 1 - EXPLORAÇÃO E INVESTIGAÇÃO:",
-    "- Inspecione o repositório, contexto e arquivos relevantes antes de planejar ou alterar código.",
-    "- Para buscas amplas, mapeamento de arquitetura ou leituras de múltiplos arquivos, utilize o subagente nativo 'scout'.",
-    "- Para diagnóstico de falhas complexas, utilize 'debug-investigator' ou 'librarian'.",
+    "1. STAGE 1 - EXPLORATION AND INVESTIGATION:",
+    "- Inspect the repository, context, and relevant files before planning or changing code.",
+    "- For broad searches, architecture mapping, or multi-file reading, use the native 'scout' subagent.",
+    "- For complex failure diagnosis, use 'debug-investigator' or 'librarian'.",
     "",
-    "2. ETAPA 2 - PLANEJAMENTO E DECOMPOSIÇÃO:",
-    "- Formule hipóteses, premissas e riscos com precisão cirúrgica.",
-    "- Registre seu raciocínio estruturado (via ferramenta 'think' se em modelo scratchpad).",
-    "- Estruture planos atômicos e seguros (como 'PLANO.md' se necessário) sem risco de deadlock.",
+    "2. STAGE 2 - PLANNING AND DECOMPOSITION:",
+    "- Formulate hypotheses, assumptions, and risks precisely.",
+    "- Record structured reasoning (through the 'think' tool when using a scratchpad model).",
+    "- Build atomic, safe plans without introducing deadlocks.",
     "",
-    "3. ETAPA 3 - EXECUÇÃO CIRÚRGICA:",
-    "- Aplique alterações mínimas, focadas e sem refatorações não solicitadas.",
-    "- Mantenha rigorosa compatibilidade de contratos e preserve a integridade da base de código.",
-    "- Guardrails de mutabilidade protegem arquivos existentes contra alterações cegas.",
+    "3. STAGE 3 - SURGICAL EXECUTION:",
+    "- Apply minimal, focused changes without unrequested refactoring.",
+    "- Preserve contracts and codebase integrity.",
+    "- Mutation guardrails protect existing files from blind changes.",
     "",
-    "4. ETAPA 4 - VERIFICAÇÃO E AUDITORIA:",
-    "- Valide com testes automatizados reais (nunca enfraqueça testes para fazê-los passar).",
-    "- Execute verificação estática de tipos (tsc --noEmit) e linters.",
-    "- Teste casos de borda e caminhos de erro explicitamente.",
-    "- Sugira ou invoque o subagente nativo 'code-quality-reviewer' para auditoria independente de integridade.",
+    "4. STAGE 4 - VERIFICATION AND AUDIT:",
+    "- Validate with real automated tests; never weaken tests to make them pass.",
+    "- Run static type checks and relevant linters.",
+    "- Explicitly exercise edge cases and error paths.",
+    "- Suggest or invoke the native 'code-quality-reviewer' subagent for an independent integrity audit.",
     "",
-    "TAREFA:",
+    "TASK:",
     task
   ].join("\n");
 }
 
 /**
- * Extensão cognitiva `/pensar` e `/boost` para Oh My Pi (OMP).
+ * Cognitive `/intellect` and `/boost` extension for Oh My Pi (OMP).
  *
- * Potencializa modelos com raciocínio adaptativo (Anti-Double-Thinking),
- * scratchpad estruturado para modelos menores, protocolo de orquestração estruturada /boost,
- * desbloqueio integrado com subagentes nativos (scout, debug-investigator, librarian),
- * criação anti-deadlock de novos arquivos e persistência resiliente à compactação.
+ * Adds adaptive reasoning, a structured scratchpad for smaller models, structured
+ * `/boost` orchestration, native subagent integration, safe new-file creation,
+ * and cognitive state persistence across compaction.
  */
-export default function pensarExtension(pi: ExtensionAPI): void {
-  const pensarState: PensarState = {
+export default function intellectExtension(pi: ExtensionAPI): void {
+  const intellectState: IntellectState = {
     active: false,
     boostActive: false,
     singleShot: false,
@@ -829,13 +828,13 @@ export default function pensarExtension(pi: ExtensionAPI): void {
   /** Register the synthetic structured scratchpad tool */
   pi.registerTool({
     name: "think",
-    label: "Think (Scratchpad Cognitivo)",
-    description: "Ferramenta de scratchpad cognitivo estruturado. Registre premissas, hipóteses, planos e análises críticas antes de ações no código.",
-    promptSnippet: "think: Ferramenta de reflexão, planejamento passo a passo e formulação de hipóteses.",
+    label: "Think (Cognitive Scratchpad)",
+    description: "Structured cognitive scratchpad. Record assumptions, hypotheses, plans, and critical analysis before changing code.",
+    promptSnippet: "think: reflection, step-by-step planning, and hypothesis formulation.",
     promptGuidelines: [
-      "Utilize a ferramenta `think` como seu scratchpad estruturado antes de modificar arquivos ou executar comandos mutatórios.",
-      "Formule hipóteses claras, identifique potenciais armadilhas e estabeleça critérios de verificação antes de qualquer mutação.",
-      "Inspecione arquivos com `read` ou `grep` antes de propor alterações definitivas."
+      "Use `think` as a structured scratchpad before changing files or running mutating commands.",
+      "Form clear hypotheses, identify potential pitfalls, and define verification criteria before mutation.",
+      "Inspect files with `read` or `grep` before proposing final changes."
     ],
     parameters: ThinkParams,
     prepareArguments: (args: unknown) => {
@@ -935,7 +934,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       return {
         content: [{
           type: "text",
-          text: `${stageLabel}Raciocínio registrado no scratchpad cognitivo. Prossiga com a investigação ou execução planejada.`
+          text: `${stageLabel}Reasoning recorded in the cognitive scratchpad. Continue with the planned investigation or execution.`
         }],
         details: {
           stage: params.stage ?? "investigation",
@@ -950,7 +949,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
   /** Calibrate reasoning mode: Native reasoning vs Scratchpad tool */
   function recalibrate(model: any, ctx: ExtensionContext): void {
     const isNative = hasNativeReasoning(model);
-    pensarState.isNative = isNative;
+    intellectState.isNative = isNative;
 
     if (isNative) {
       // Model with native reasoning: activate thinkingLevel high/max, remove synthetic think tool
@@ -963,8 +962,8 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       if (activeTools.includes("think")) {
         pi.setActiveTools(activeTools.filter(t => t !== "think"));
       }
-      ctx.ui?.setStatus?.("pensar", pensarState.active ? "🧠 Pensar [Ativo]" : undefined);
-      ctx.ui?.setStatus?.("boost", pensarState.boostActive ? "🚀 Boost [Ativo]" : undefined);
+      ctx.ui?.setStatus?.("intellect", intellectState.active ? "🧠 Intellect [Active]" : undefined);
+      ctx.ui?.setStatus?.("boost", intellectState.boostActive ? "🚀 Boost [Active]" : undefined);
     } else {
       // Model without native reasoning: keep thinkingLevel off, activate synthetic think tool
       try {
@@ -975,30 +974,30 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       if (!activeTools.includes("think")) {
         pi.setActiveTools([...activeTools, "think"]);
       }
-      ctx.ui?.setStatus?.("pensar", pensarState.active ? "🧠 Pensar [Ativo]" : undefined);
-      ctx.ui?.setStatus?.("boost", pensarState.boostActive ? "🚀 Boost [Ativo]" : undefined);
+      ctx.ui?.setStatus?.("intellect", intellectState.active ? "🧠 Intellect [Active]" : undefined);
+      ctx.ui?.setStatus?.("boost", intellectState.boostActive ? "🚀 Boost [Active]" : undefined);
     }
   }
 
   /** Activate thinking mode */
   function activate(ctx: ExtensionContext, singleShot: boolean): void {
-    pensarState.active = true;
-    pensarState.singleShot = singleShot;
+    intellectState.active = true;
+    intellectState.singleShot = singleShot;
     recalibrate(ctx.model, ctx);
-    ctx.ui?.notify?.(`Modo Pensar ativado${singleShot ? " [Modo Pontual]" : ""}.`, "info");
+    ctx.ui?.notify?.(`Intellect mode enabled${singleShot ? " [One-off Mode]" : ""}.`, "info");
   }
 
   /** Deactivate thinking mode */
   function deactivate(ctx: ExtensionContext, reason?: string): void {
-    pensarState.active = false;
-    pensarState.singleShot = false;
-    ctx.ui?.setStatus?.("pensar", undefined);
+    intellectState.active = false;
+    intellectState.singleShot = false;
+    ctx.ui?.setStatus?.("intellect", undefined);
 
-    if (pensarState.boostActive) {
+    if (intellectState.boostActive) {
       recalibrate(ctx.model, ctx);
     } else {
-      pensarState.createdPaths.clear();
-      pensarState.sessionReadPaths.clear();
+      intellectState.createdPaths.clear();
+      intellectState.sessionReadPaths.clear();
       pendingCreations.clear();
       const activeTools = pi.getActiveTools?.() || [];
       if (activeTools.includes("think")) {
@@ -1009,39 +1008,39 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       } catch {}
     }
 
-    ctx.ui?.notify?.(reason ? `Modo Pensar desativado: ${reason}` : "Modo Pensar desativado.", "info");
+    ctx.ui?.notify?.(reason ? `Intellect mode disabled: ${reason}` : "Intellect mode disabled.", "info");
   }
 
-  /** Handler for /pensar command: continuous cognitive mode */
-  const pensarCommandHandler = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+  /** Handler for /intellect command: continuous cognitive mode */
+  const intellectCommandHandler = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
     const trimmed = args.trim();
 
     if (trimmed.toLowerCase() === "on") {
-      if (!pensarState.active) {
+      if (!intellectState.active) {
         activate(ctx, false);
       } else {
-        if (pensarState.singleShot) {
-          pensarState.singleShot = false;
-          ctx.ui?.notify?.("Modo Pensar fixado como ativo permanente.", "info");
+        if (intellectState.singleShot) {
+          intellectState.singleShot = false;
+          ctx.ui?.notify?.("Intellect mode is now permanently active.", "info");
         } else {
-          ctx.ui?.notify?.("Modo Pensar já está ativo.", "info");
+          ctx.ui?.notify?.("Intellect mode is already active.", "info");
         }
       }
       return;
     }
 
     if (trimmed.toLowerCase() === "off") {
-      if (pensarState.active) {
+      if (intellectState.active) {
         deactivate(ctx);
       } else {
-        ctx.ui?.notify?.("Modo Pensar já está desativado.", "info");
+        ctx.ui?.notify?.("Intellect mode is already disabled.", "info");
       }
       return;
     }
 
     // Toggle when invoked without arguments
     if (!trimmed) {
-      if (pensarState.active) {
+      if (intellectState.active) {
         deactivate(ctx);
       } else {
         activate(ctx, false);
@@ -1053,7 +1052,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
     activate(ctx, true);
     mentalState.lastTask = trimmed;
     ctx.ui?.notify?.(
-      `Executando tarefa com raciocínio profundo: "${trimmed.length > 50 ? trimmed.slice(0, 47) + "..." : trimmed}"`,
+      `Running task with deep reasoning: "${trimmed.length > 50 ? trimmed.slice(0, 47) + "..." : trimmed}"`,
       "info"
     );
     try {
@@ -1062,9 +1061,9 @@ export default function pensarExtension(pi: ExtensionAPI): void {
         : undefined;
       await pi.sendUserMessage(trimmed, options);
     } catch (err) {
-      deactivate(ctx, "Falha ao executar tarefa pontual.");
+      deactivate(ctx, "Failed to run one-off task.");
       ctx.ui?.notify?.(
-        `Erro ao executar tarefa pontual: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to run one-off task: ${err instanceof Error ? err.message : String(err)}`,
         "error"
       );
     }
@@ -1075,52 +1074,52 @@ export default function pensarExtension(pi: ExtensionAPI): void {
     const trimmed = args.trim();
 
     if (trimmed.toLowerCase() === "on") {
-      if (!pensarState.boostActive) {
-        pensarState.boostActive = true;
-        pensarState.singleShot = false;
+      if (!intellectState.boostActive) {
+        intellectState.boostActive = true;
+        intellectState.singleShot = false;
         recalibrate(ctx.model, ctx);
-        ctx.ui?.notify?.("Modo Boost ativado: protocolo de excelência em 4 etapas habilitado.", "info");
+        ctx.ui?.notify?.("Boost mode enabled: four-stage execution protocol active.", "info");
       } else {
-        ctx.ui?.notify?.("Modo Boost já está ativo.", "info");
+        ctx.ui?.notify?.("Boost mode is already active.", "info");
       }
       return;
     }
 
     if (trimmed.toLowerCase() === "off") {
-      if (pensarState.boostActive) {
-        pensarState.boostActive = false;
+      if (intellectState.boostActive) {
+        intellectState.boostActive = false;
         ctx.ui?.setStatus?.("boost", undefined);
-        if (pensarState.active) recalibrate(ctx.model, ctx);
-        ctx.ui?.notify?.("Modo Boost desativado.", "info");
+        if (intellectState.active) recalibrate(ctx.model, ctx);
+        ctx.ui?.notify?.("Boost mode disabled.", "info");
       } else {
-        ctx.ui?.notify?.("Modo Boost já está desativado.", "info");
+        ctx.ui?.notify?.("Boost mode is already disabled.", "info");
       }
       return;
     }
 
     // Toggle when invoked without arguments
     if (!trimmed) {
-      if (pensarState.boostActive) {
-        pensarState.boostActive = false;
+      if (intellectState.boostActive) {
+        intellectState.boostActive = false;
         ctx.ui?.setStatus?.("boost", undefined);
-        if (pensarState.active) recalibrate(ctx.model, ctx);
-        ctx.ui?.notify?.("Modo Boost desativado.", "info");
+        if (intellectState.active) recalibrate(ctx.model, ctx);
+        ctx.ui?.notify?.("Boost mode disabled.", "info");
       } else {
-        pensarState.boostActive = true;
-        pensarState.singleShot = false;
+        intellectState.boostActive = true;
+        intellectState.singleShot = false;
         recalibrate(ctx.model, ctx);
-        ctx.ui?.notify?.("Modo Boost ativado: protocolo de excelência em 4 etapas habilitado.", "info");
+        ctx.ui?.notify?.("Boost mode enabled: four-stage execution protocol active.", "info");
       }
       return;
     }
 
     // Directed 4-stage orchestration for specific task
-    pensarState.boostActive = true;
-    pensarState.singleShot = true;
+    intellectState.boostActive = true;
+    intellectState.singleShot = true;
     recalibrate(ctx.model, ctx);
     mentalState.lastTask = trimmed;
     ctx.ui?.notify?.(
-      `Executando tarefa com protocolo /boost: "${trimmed.length > 45 ? trimmed.slice(0, 42) + "..." : trimmed}"`,
+      `Running task with /boost protocol: "${trimmed.length > 45 ? trimmed.slice(0, 42) + "..." : trimmed}"`,
       "info"
     );
     try {
@@ -1130,33 +1129,33 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       const boostPrompt = buildBoostPrompt(trimmed);
       await pi.sendUserMessage(boostPrompt, options);
     } catch (err) {
-      deactivate(ctx, "Falha ao executar tarefa /boost.");
+      deactivate(ctx, "Failed to run /boost task.");
       ctx.ui?.notify?.(
-        `Erro ao executar tarefa /boost: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to run /boost task: ${err instanceof Error ? err.message : String(err)}`,
         "error"
       );
     }
   };
 
   // Register commands
-  pi.registerCommand("pensar", {
-    description: "Ativa/desativa raciocínio profundo contínuo ou executa tarefa pontual (/pensar [tarefa])",
-    handler: pensarCommandHandler
+  pi.registerCommand("intellect", {
+    description: "Toggle continuous deep reasoning or run a one-off task (/intellect [task])",
+    handler: intellectCommandHandler
   });
 
   pi.registerCommand("boost", {
-    description: "Executa protocolo de orquestração estruturada em 4 etapas com subagentes (/boost <tarefa>)",
+    description: "Run a structured four-stage orchestration protocol with subagents (/boost <task>)",
     handler: boostCommandHandler
   });
 
   // Dynamic model switch recalibrates mode (Native vs Scratchpad) while preserving cognitive state
   pi.on("model_select", (event: ModelSelectEvent, ctx: ExtensionContext) => {
-    if (pensarState.active || pensarState.boostActive) {
+    if (intellectState.active || intellectState.boostActive) {
       recalibrate(event?.model, ctx);
-      const modeDesc = pensarState.isNative ? "Raciocínio Nativo" : "Scratchpad Cognitivo";
-      const modelName = event?.model?.name || event?.model?.id || "desconhecido";
+      const modeDesc = intellectState.isNative ? "Native Reasoning" : "Cognitive Scratchpad";
+      const modelName = event?.model?.name || event?.model?.id || "unknown";
       ctx.ui?.notify?.(
-        `Modelo alterado para ${modelName}. Raciocínio recalibrado para: ${modeDesc}.`,
+        `Model changed to ${modelName}. Reasoning recalibrated to: ${modeDesc}.`,
         "info"
       );
     }
@@ -1164,17 +1163,17 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
   // Single-shot automatic deactivation on settled
   pi.on("agent_settled", (_event: AgentSettledEvent, ctx: ExtensionContext) => {
-    pensarState.investigatedInTurn = false;
-    pensarState.turnReadPaths.clear();
+    intellectState.investigatedInTurn = false;
+    intellectState.turnReadPaths.clear();
     pendingInvestigations.clear();
     pendingCreations.clear();
 
-    if (pensarState.singleShot) {
-      pensarState.singleShot = false;
-      if (pensarState.boostActive) {
-        pensarState.boostActive = false;
+    if (intellectState.singleShot) {
+      intellectState.singleShot = false;
+      if (intellectState.boostActive) {
+        intellectState.boostActive = false;
         ctx.ui?.setStatus?.("boost", undefined);
-      } else if (pensarState.active) {
+      } else if (intellectState.active) {
         deactivate(ctx, "Tarefa pontual concluída.");
       }
     }
@@ -1183,27 +1182,27 @@ export default function pensarExtension(pi: ExtensionAPI): void {
   // Turn initialization: reset investigation tracker on conversational turn start
   pi.on("turn_start", (event: any) => {
     if (event?.turnIndex === 0 || event?.turnIndex === undefined) {
-      pensarState.investigatedInTurn = false;
-      pensarState.turnReadPaths.clear();
+      intellectState.investigatedInTurn = false;
+      intellectState.turnReadPaths.clear();
       pendingInvestigations.clear();
       pendingCreations.clear();
     }
   });
 
   pi.on("agent_start", () => {
-    pensarState.investigatedInTurn = false;
-    pensarState.turnReadPaths.clear();
+    intellectState.investigatedInTurn = false;
+    intellectState.turnReadPaths.clear();
     pendingInvestigations.clear();
     pendingCreations.clear();
   });
 
   // Session start: restore mental and operational state
   pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
-    pensarState.investigatedInTurn = false;
-    pensarState.turnReadPaths.clear();
-    pensarState.createdPaths.clear();
-    pensarState.sessionReadPaths.clear();
-    pensarState.singleShot = false;
+    intellectState.investigatedInTurn = false;
+    intellectState.turnReadPaths.clear();
+    intellectState.createdPaths.clear();
+    intellectState.sessionReadPaths.clear();
+    intellectState.singleShot = false;
     pendingInvestigations.clear();
     pendingCreations.clear();
 
@@ -1222,10 +1221,10 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       try {
         const entries = ctx.sessionManager.getEntries();
         for (const entry of entries) {
-          if ((!entry.type || entry.type === "custom") && entry.customType === "pensar_mental_state" && entry.data) {
+          if ((!entry.type || entry.type === "custom") && entry.customType === "intellect_mental_state" && entry.data) {
             const data = entry.data as any;
-            if (typeof data.pensarActive === "boolean") {
-              shouldBeActive = data.pensarActive;
+            if (typeof data.intellectActive === "boolean") {
+              shouldBeActive = data.intellectActive;
             }
             if (typeof data.boostActive === "boolean") {
               shouldBeBoost = data.boostActive;
@@ -1251,13 +1250,13 @@ export default function pensarExtension(pi: ExtensionAPI): void {
             if (Array.isArray(data.investigatedFiles)) {
               for (const f of data.investigatedFiles) {
                 const k = normalizePathKey(String(f));
-                pensarState.sessionReadPaths.add(k);
-                pensarState.turnReadPaths.add(k);
+                intellectState.sessionReadPaths.add(k);
+                intellectState.turnReadPaths.add(k);
               }
             }
             if (Array.isArray(data.createdFiles)) {
               for (const f of data.createdFiles) {
-                pensarState.createdPaths.add(normalizePathKey(String(f)));
+                intellectState.createdPaths.add(normalizePathKey(String(f)));
               }
             }
             if (data.lastTask) {
@@ -1268,8 +1267,8 @@ export default function pensarExtension(pi: ExtensionAPI): void {
       } catch {}
     }
 
-    pensarState.active = shouldBeActive;
-    pensarState.boostActive = shouldBeBoost;
+    intellectState.active = shouldBeActive;
+    intellectState.boostActive = shouldBeBoost;
     if (shouldBeActive || shouldBeBoost) {
       recalibrate(ctx.model, ctx);
     }
@@ -1277,37 +1276,37 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
   // Inject execution discipline and boost rules in before_agent_start
   pi.on("before_agent_start", (event: BeforeAgentStartEvent, _ctx: ExtensionContext): BeforeAgentStartEventResult | void => {
-    if (!pensarState.active && !pensarState.boostActive) return;
+    if (!intellectState.active && !intellectState.boostActive) return;
 
     const sections: string[] = [];
 
-    if (pensarState.boostActive) {
+    if (intellectState.boostActive) {
       sections.push(
-        "[PROTOCOLO DE ORQUESTRAÇÃO ESTRUTURADA - BOOST ATIVO]\n" +
-        "1. Exploração: Inspecione arquivos com 'read', 'grep', 'find' ou acione os subagentes 'scout'/'debug-investigator'/'librarian'.\n" +
-        "2. Planejamento/Decomposição: Defina hipóteses e etapas atômicas (use 'think' em modelos não-nativos).\n" +
-        "3. Execução Cirúrgica: Mutações pontuais; criação de novos arquivos legítimos permitida sem deadlock.\n" +
-        "4. Verificação/Auditoria: Valide com testes automatizados e consulte 'code-quality-reviewer' quando apropriado."
+        "[STRUCTURED ORCHESTRATION PROTOCOL - BOOST ACTIVE]\n" +
+        "1. Exploration: inspect files with 'read', 'grep', or 'find', or use the 'scout', 'debug-investigator', or 'librarian' subagents.\n" +
+        "2. Planning and decomposition: define hypotheses and atomic steps; use 'think' with non-native models.\n" +
+        "3. Surgical execution: make focused changes; legitimate new-file creation remains available.\n" +
+        "4. Verification and audit: validate with automated checks and consult 'code-quality-reviewer' when appropriate."
       );
     }
 
-    if (pensarState.active) {
+    if (intellectState.active) {
       sections.push(
-        "[DISCIPLINA DE REFLEXÃO - MODO PENSAR ATIVO]\n" +
-        "1. Entenda antes de agir: identifique o objetivo, as restrições e qualquer informação realmente necessária.\n" +
-        "2. Questione a primeira conclusão: quando houver ambiguidade relevante, considere ao menos uma explicação ou solução alternativa.\n" +
-        "3. Verifique antes de afirmar: sustente conclusões com código, ferramentas ou resultados observáveis.\n" +
-        "4. Revisão final silenciosa: confirme que respondeu ao pedido real, respeitou as evidências, concluiu o trabalho necessário e não excedeu o alcance da verificação."
+        "[REFLECTION DISCIPLINE - INTELLECT ACTIVE]\n" +
+        "1. Understand before acting: identify the goal, constraints, and genuinely necessary information.\n" +
+        "2. Challenge the first conclusion: when relevant ambiguity exists, consider at least one alternative explanation or solution.\n" +
+        "3. Verify before claiming: support conclusions with code, tools, or observable results.\n" +
+        "4. Silent final review: confirm that the response addresses the real request, respects the evidence, completes the necessary work, and does not overstate verification."
       );
     }
 
-    if (pensarState.active && !pensarState.isNative) {
+    if (intellectState.active && !intellectState.isNative) {
       sections.push(
-        "[DISCIPLINA COGNITIVA - MODO PENSAR ATIVO]\n" +
-        "1. Scratchpad Estruturado: Use a ferramenta 'think' antes de qualquer tomada de decisão crítica, alteração ou execução.\n" +
-        "2. Investigação Obrigatória: Inspecione arquivos com 'read', 'grep' ou 'find' antes de propor modificações.\n" +
-        "3. Guardrail de Mutabilidade: Tentativas de editar ou escrever arquivos sem prévia investigação no turno serão bloqueadas.\n" +
-        "4. Raciocínio Baseado em Evidências: Justifique suas conclusões com evidências concretas encontradas no código."
+        "[COGNITIVE DISCIPLINE - INTELLECT ACTIVE]\n" +
+        "1. Structured scratchpad: use the 'think' tool before critical decisions, changes, or execution.\n" +
+        "2. Required investigation: inspect files with 'read', 'grep', or 'find' before proposing changes.\n" +
+        "3. Mutation guardrail: attempts to edit or overwrite files without prior investigation in the turn are blocked.\n" +
+        "4. Evidence-based reasoning: justify conclusions with concrete evidence found in the code."
       );
     }
 
@@ -1325,7 +1324,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
   // Mutability guardrails: intercept tool_call to prevent blind mutations
   pi.on("tool_call", (event: ToolCallEvent, ctx: ExtensionContext): ToolCallEventResult | void => {
-    if (!pensarState.active && !pensarState.boostActive) return;
+    if (!intellectState.active && !intellectState.boostActive) return;
 
     const toolName = event.toolName;
 
@@ -1353,27 +1352,27 @@ export default function pensarExtension(pi: ExtensionAPI): void {
     const isPathRecorded = (key: string): boolean => {
       if (!key) return false;
       if (
-        pensarState.turnReadPaths.has(key) ||
-        pensarState.createdPaths.has(key) ||
-        pensarState.sessionReadPaths.has(key)
+        intellectState.turnReadPaths.has(key) ||
+        intellectState.createdPaths.has(key) ||
+        intellectState.sessionReadPaths.has(key)
       ) return true;
 
       // Handle drive letter variations: e.g. c:/workspace/src/app.ts vs /workspace/src/app.ts
       if (/^[a-z]:\//.test(key)) {
         const withoutDrive = key.slice(2);
         if (
-          pensarState.turnReadPaths.has(withoutDrive) ||
-          pensarState.createdPaths.has(withoutDrive) ||
-          pensarState.sessionReadPaths.has(withoutDrive)
+          intellectState.turnReadPaths.has(withoutDrive) ||
+          intellectState.createdPaths.has(withoutDrive) ||
+          intellectState.sessionReadPaths.has(withoutDrive)
         ) return true;
       } else if (key.startsWith("/")) {
-        for (const item of pensarState.turnReadPaths) {
+        for (const item of intellectState.turnReadPaths) {
           if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
         }
-        for (const item of pensarState.createdPaths) {
+        for (const item of intellectState.createdPaths) {
           if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
         }
-        for (const item of pensarState.sessionReadPaths) {
+        for (const item of intellectState.sessionReadPaths) {
           if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
         }
       }
@@ -1383,23 +1382,23 @@ export default function pensarExtension(pi: ExtensionAPI): void {
           if (path.isAbsolute(targetPath)) {
             const relKey = normalizePathKey(path.relative(ctx.cwd, targetPath));
             if (
-              pensarState.turnReadPaths.has(relKey) ||
-              pensarState.createdPaths.has(relKey) ||
-              pensarState.sessionReadPaths.has(relKey)
+              intellectState.turnReadPaths.has(relKey) ||
+              intellectState.createdPaths.has(relKey) ||
+              intellectState.sessionReadPaths.has(relKey)
             ) return true;
           } else {
             const absKey = normalizePathKey(path.resolve(ctx.cwd, targetPath));
             if (
-              pensarState.turnReadPaths.has(absKey) ||
-              pensarState.createdPaths.has(absKey) ||
-              pensarState.sessionReadPaths.has(absKey)
+              intellectState.turnReadPaths.has(absKey) ||
+              intellectState.createdPaths.has(absKey) ||
+              intellectState.sessionReadPaths.has(absKey)
             ) return true;
             if (/^[a-z]:\//.test(absKey)) {
               const absWithoutDrive = absKey.slice(2);
               if (
-                pensarState.turnReadPaths.has(absWithoutDrive) ||
-                pensarState.createdPaths.has(absWithoutDrive) ||
-                pensarState.sessionReadPaths.has(absWithoutDrive)
+                intellectState.turnReadPaths.has(absWithoutDrive) ||
+                intellectState.createdPaths.has(absWithoutDrive) ||
+                intellectState.sessionReadPaths.has(absWithoutDrive)
               ) return true;
             }
           }
@@ -1412,7 +1411,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
     if (isTargetInvestigated) {
       if (pathKey) {
-        pensarState.turnReadPaths.add(pathKey);
+        intellectState.turnReadPaths.add(pathKey);
       }
       return;
     }
@@ -1434,10 +1433,10 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
       return {
         block: true,
-        reason: `Guardrail cognitivo (/pensar): Operação de mutação '${toolName}' bloqueada em arquivo existente` +
+        reason: `Cognitive guardrail (/intellect): Mutation '${toolName}' blocked for an existing file` +
                 (targetPath ? ` ('${targetPath}')` : "") + `. ` +
-                `Nenhum arquivo relevante foi investigado ou lido neste turno. ` +
-                `Por favor, utilize 'read', 'grep' ou 'find' para inspecionar os arquivos relevantes e planeje com 'think' antes de realizar alterações.`
+                `No relevant file was investigated or read in this turn. ` +
+                `Use 'read', 'grep', or 'find' to inspect the relevant files, then plan with 'think' before changing them.`
       };
     }
 
@@ -1450,12 +1449,12 @@ export default function pensarExtension(pi: ExtensionAPI): void {
     ]);
     if (shellTools.has(lowerToolName)) {
       const cmd = extractCommand(event.input);
-      if (isMutatingCommand(cmd) && !pensarState.investigatedInTurn) {
+      if (isMutatingCommand(cmd) && !intellectState.investigatedInTurn) {
         return {
           block: true,
-          reason: `Guardrail cognitivo (/pensar): Comando mutatório de shell bloqueado ('${cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd}'). ` +
-                  `Nenhum arquivo ou contexto relevante foi investigado neste turno. ` +
-                  `Por favor, inspecione os arquivos e o ambiente antes de aplicar modificações.`
+          reason: `Cognitive guardrail (/intellect): Mutating shell command blocked ('${cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd}'). ` +
+                  `No relevant file or context was investigated in this turn. ` +
+                  `Inspect the files and environment before applying changes.`
         };
       } else if (isInvestigationCommand(cmd)) {
         const callId = event.toolCallId;
@@ -1466,7 +1465,7 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
   // Listen for tool_result to capture investigated paths from subagents and tools
   pi.on("tool_result", (event: ToolResultEvent, _ctx: ExtensionContext) => {
-    if (!pensarState.active && !pensarState.boostActive) return;
+    if (!intellectState.active && !intellectState.boostActive) return;
 
     const toolName = event.toolName;
     const lowerToolName = toolName.toLowerCase();
@@ -1518,8 +1517,8 @@ export default function pensarExtension(pi: ExtensionAPI): void {
     const createdPath = pendingCreations.get(event.toolCallId);
     pendingCreations.delete(event.toolCallId);
     if (createdPath) {
-      pensarState.createdPaths.add(createdPath);
-      pensarState.turnReadPaths.add(createdPath);
+      intellectState.createdPaths.add(createdPath);
+      intellectState.turnReadPaths.add(createdPath);
     }
 
     const pending = pendingInvestigations.get(event.toolCallId);
@@ -1528,43 +1527,43 @@ export default function pensarExtension(pi: ExtensionAPI): void {
 
     const paths = new Set([...pending.paths, ...extractPathsFromToolResult(event)]);
     for (const investigatedPath of paths) {
-      pensarState.turnReadPaths.add(normalizePathKey(investigatedPath));
+      intellectState.turnReadPaths.add(normalizePathKey(investigatedPath));
     }
-    pensarState.investigatedInTurn = true;
+    intellectState.investigatedInTurn = true;
   });
 
   // Mental state preservation on compaction
   pi.on("session_before_compact", (event: SessionBeforeCompactEvent, _ctx: ExtensionContext): SessionBeforeCompactResult | void => {
     if (
-      !pensarState.active && !pensarState.boostActive &&
+      !intellectState.active && !intellectState.boostActive &&
       mentalState.thoughts.length === 0 &&
       !mentalState.lastTask &&
       mentalState.hypotheses.size === 0 &&
       mentalState.premises.size === 0 &&
       mentalState.plans.length === 0 &&
-      pensarState.turnReadPaths.size === 0 &&
-      pensarState.createdPaths.size === 0 &&
-      pensarState.sessionReadPaths.size === 0
+      intellectState.turnReadPaths.size === 0 &&
+      intellectState.createdPaths.size === 0 &&
+      intellectState.sessionReadPaths.size === 0
     ) return;
 
     const payload = {
       timestamp: Date.now(),
-      pensarActive: pensarState.active,
-      boostActive: pensarState.boostActive,
-      mode: pensarState.active ? (pensarState.isNative ? "native" : "scratchpad") : "inactive",
+      intellectActive: intellectState.active,
+      boostActive: intellectState.boostActive,
+      mode: intellectState.active ? (intellectState.isNative ? "native" : "scratchpad") : "inactive",
       thinkingLevel: pi.getThinkingLevel(),
       lastTask: mentalState.lastTask,
       recentThoughts: mentalState.thoughts.slice(-10),
       hypotheses: Array.from(mentalState.hypotheses),
       premises: Array.from(mentalState.premises),
       plans: mentalState.plans.slice(-5),
-      investigatedFiles: Array.from(new Set([...pensarState.sessionReadPaths, ...pensarState.turnReadPaths])),
-      createdFiles: Array.from(pensarState.createdPaths),
-      summary: "Estado mental do modo /pensar preservado antes da compactação para continuidade cognitiva."
+      investigatedFiles: Array.from(new Set([...intellectState.sessionReadPaths, ...intellectState.turnReadPaths])),
+      createdFiles: Array.from(intellectState.createdPaths),
+      summary: "Intellect cognitive state preserved before compaction for reasoning continuity."
     };
 
     try {
-      pi.appendEntry("pensar_mental_state", payload);
+      pi.appendEntry("intellect_mental_state", payload);
     } catch {}
 
     const mentalSummary = [
