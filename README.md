@@ -105,6 +105,8 @@ Existing-file edits and overwrites require a successful source read matching the
 
 Codegraph source blocks with a file heading and numbered source lines count as inspection, including calls dispatched through `write` to its `xd://` device. Filename mentions, search listings, and subagent prose alone do not authorize edits. Block messages identify the file, known/current revisions, last accepted read, source tool, and a stable reason code.
 
+Structural summaries without source do not authorize edits. Raw reads must match the complete file (allowing normalized line endings and an omitted final newline). Codegraph numbered source lines must match those same lines in the current local file; stale indexed source is rejected. This checks the returned excerpt, not the freshness of unreturned index metadata.
+
 Git inspection commands are classified by subcommand rather than words in filenames. Mutating shell commands require fresh source context. This is a workflow aid, **not a sandbox or authorization system**: arbitrary programs, `eval`, and tool devices enforce their own contracts. The extension does not claim to intercept every possible write. User permission remains separate from technical evidence.
 
 The extension contains no keys, tokens, or credentials.

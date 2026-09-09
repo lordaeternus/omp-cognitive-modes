@@ -46,6 +46,24 @@ test('Codegraph source counts but path mentions do not', async t => {
   let c = h.call('mcp__codegraph_explore', { query: 'a.ts' }); h.result(c.event, 'Referenced file: a.ts'); assert.equal(h.edit()?.block, true);
   c = h.call('mcp__codegraph_explore', { query: 'a.ts' }); h.result(c.event, '## a.ts\n```typescript\n1\texport const a = 1;\n```'); assert.equal(h.edit(), undefined);
 });
+test('structural summary cannot authorize an edit without source', async t => {
+  const h = await harness(t);
+  const { event } = h.call('read', { path: 'a.ts' });
+  h.result(event, '[a.ts#ABCD]\nStructural summary: exported constant a; body elided. Read :1-10 for source.');
+  assert.equal(h.edit()?.block, true, 'A structural summary must not count as inspected source');
+  h.read();
+  assert.equal(h.edit(), undefined);
+});
+test('stale Codegraph source cannot authorize the current file revision', async t => {
+  const h = await harness(t);
+  fs.writeFileSync(path.join(h.cwd, 'a.ts'), 'export const a = 2;\n');
+  const { event } = h.call('mcp__codegraph_explore', { query: 'a.ts' });
+  h.result(event, '## a.ts\n```typescript\n1\texport const a = 1;\n```');
+  assert.equal(h.edit()?.block, true, 'Stale indexed source must not be recorded as the current revision');
+  const fresh = h.call('read', { path: 'a.ts:1-10' });
+  h.result(fresh.event, '[a.ts#ABCD]\n1:export const a = 2;');
+  assert.equal(h.edit(), undefined);
+});
 test('guidance never requires absent think or find tools', async t => {
   const h = await harness(t); assert.doesNotMatch(h.edit().reason, /'think'|'find'/); assert.match(h.edit().reason, /a\.ts/);
 });

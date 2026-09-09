@@ -1406,15 +1406,33 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     pendingReads.delete(event.toolCallId);
     if (!pending || event.isError) return;
     const text = event.content.filter(item => item.type === "text").map(item => item.text).join("\n");
-    const paths = new Set(pending.paths);
-    // Only source blocks count: a filename mentioned in prose is not evidence.
-    for (const match of text.matchAll(/(?:^|\n)(?:\[([^\]\n]+)#[a-f\d]{4}\]|#{1,6}\s+`?([^`\n]+?)`?)\s*\n(?:```[^\n]*\n)?(?=\s*\d+[\t:])/gim)) {
-      paths.add(fileKey(match[1] || match[2], ctx.cwd));
+    const sources = new Map<string, { line: number; text: string }[]>();
+    let sourceFile: string | undefined;
+    for (const line of text.split(/\r?\n/)) {
+      const header = /^(?:\[([^\]\n]+)#[a-f\d]{4}\]|#{1,6}\s+`?([^`\n]+?)`?)\s*$/i.exec(line);
+      if (header) {
+        sourceFile = fileKey(header[1] || header[2], ctx.cwd);
+        if (!sources.has(sourceFile)) sources.set(sourceFile, []);
+        continue;
+      }
+      const numbered = /^\s*(\d+)[\t:](.*)$/.exec(line);
+      if (sourceFile && numbered) sources.get(sourceFile)!.push({ line: Number(numbered[1]), text: numbered[2] });
     }
-    for (const file of paths) {
-      const current = revision(file);
+    for (const file of new Set([...pending.paths, ...sources.keys()])) {
       const before = pending.revisions.get(file);
+      let content: string;
+      try { content = fs.readFileSync(file, "utf8"); } catch { continue; }
+      const current = createHash("sha256").update(content).digest("hex");
       if (!current || (before && before !== current)) continue;
+      const lines = sources.get(file);
+      const directRead = pending.paths.includes(file);
+      if (!lines?.length) {
+        // Raw reads are valid only when they return the actual complete source.
+        if (!directRead || text.replace(/\r\n/g, "\n").replace(/\n$/, "") !== content.replace(/\r\n/g, "\n").replace(/\n$/, "")) continue;
+      } else if (!directRead) {
+        const actual = content.split(/\r?\n/);
+        if (lines.some(line => line.line < 1 || actual[line.line - 1] !== line.text)) continue;
+      }
       fileEvidence.set(file, { revision: current, tool: pending.tool, readAt: Date.now() });
     }
   });
