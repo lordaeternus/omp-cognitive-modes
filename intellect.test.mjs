@@ -80,3 +80,33 @@ test('file changing while a read is in flight does not establish fresh evidence'
   const h = await harness(t); const c = h.call('read', { path: 'a.ts' });
   fs.writeFileSync(path.join(h.cwd, 'a.ts'), 'changed'); h.result(c.event, 'old source'); assert.equal(h.edit()?.block, true);
 });
+
+function modes({ native = true, fail = false } = {}) {
+  const handlers = {}, commands = {}, status = {};
+  let tools = ['read', 'edit'], level = 'low';
+  extension.default({ on: (name, fn) => { handlers[name] = fn; }, registerTool() {}, registerCommand: (name, value) => { commands[name] = value; }, getActiveTools: () => tools, setActiveTools: value => { tools = value; }, getThinkingLevel: () => level, setThinkingLevel: value => { level = value; }, sendUserMessage: async () => { if (fail) throw new Error('send failed'); } });
+  const ctx = { cwd: process.cwd(), model: { reasoning: native }, isIdle: () => true, ui: { notify() {}, setStatus: (key, value) => { status[key] = value; } } };
+  return { status, tools: () => tools, level: () => level, command: (name, args) => commands[name].handler(args, ctx), settle: () => handlers.agent_settled({}, ctx) };
+}
+test('Boost send failure preserves Intellect and removes temporary Boost', async () => {
+  const h = modes({ fail: true }); await h.command('intellect', 'on'); await h.command('boost', 'task');
+  assert.ok(h.status.intellect); assert.equal(h.status.boost, undefined);
+});
+test('Intellect one-off does not disable continuous Boost', async () => {
+  const h = modes(); await h.command('boost', 'on'); await h.command('intellect', 'task'); h.settle();
+  assert.ok(h.status.boost); assert.equal(h.status.intellect, undefined);
+});
+test('Boost task preserves continuous activation', async () => {
+  const h = modes(); await h.command('boost', 'on'); await h.command('boost', 'task'); h.settle(); assert.ok(h.status.boost);
+});
+test('Boost off and one-off completion restore prior calibration', async () => {
+  for (const native of [true, false]) for (const stop of ['off', '', 'settle']) {
+    const h = modes({ native }); await h.command('boost', stop === 'settle' ? 'task' : 'on');
+    if (stop === 'settle') h.settle(); else await h.command('boost', stop);
+    assert.equal(h.status.boost, undefined); assert.equal(h.level(), 'low'); assert.equal(h.tools().includes('think'), false);
+  }
+});
+test('Boost on promotes a one-off without changing Intellect lifetime', async () => {
+  const h = modes(); await h.command('intellect', 'task'); await h.command('boost', 'task'); await h.command('boost', 'on'); h.settle();
+  assert.ok(h.status.boost); assert.equal(h.status.intellect, undefined);
+});

@@ -88,6 +88,8 @@ The command also supports explicit state changes and one-off tasks:
 /boost review this module and fix the problems you find
 ```
 
+One-off tasks preserve an already continuous mode. Boost and Intellect have independent one-off lifetimes; completing or failing a Boost task does not disable Intellect. Disabling the last active mode restores the thinking level and scratchpad availability captured before activation.
+
 ### Using both modes
 
 ```text

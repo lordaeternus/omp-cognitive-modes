@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
+import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -844,6 +845,16 @@ export default function intellectExtension(pi: ExtensionAPI): void {
   const pendingInvestigations = new Map<string, { paths: string[]; isTask: boolean; isShell?: boolean }>();
   const pendingCreations = new Map<string, string>();
 
+  let boostSingleShot = false;
+  let previousCalibration: { level: ThinkingLevel; think: boolean } | undefined;
+  function releaseCalibration(ctx: ExtensionContext): void {
+    if (intellectState.active || intellectState.boostActive) { recalibrate(ctx.model, ctx); return; }
+    if (!previousCalibration) return;
+    const tools = pi.getActiveTools();
+    pi.setActiveTools(previousCalibration.think ? (tools.includes("think") ? tools : [...tools, "think"]) : tools.filter(tool => tool !== "think"));
+    pi.setThinkingLevel(previousCalibration.level);
+    previousCalibration = undefined;
+  }
   const fileEvidence = new Map<string, { revision: string; tool: string; readAt: number }>();
   const pendingReads = new Map<string, { paths: string[]; revisions: Map<string, string>; tool: string }>();
   const fileKey = (value: string, cwd: string): string => {
@@ -977,6 +988,7 @@ export default function intellectExtension(pi: ExtensionAPI): void {
 
   /** Calibrate reasoning mode: Native reasoning vs Scratchpad tool */
   function recalibrate(model: any, ctx: ExtensionContext): void {
+    previousCalibration ??= { level: pi.getThinkingLevel(), think: pi.getActiveTools().includes("think") };
     const isNative = hasNativeReasoning(model);
     intellectState.isNative = isNative;
 
@@ -1010,8 +1022,8 @@ export default function intellectExtension(pi: ExtensionAPI): void {
 
   /** Activate thinking mode */
   function activate(ctx: ExtensionContext, singleShot: boolean): void {
+    intellectState.singleShot = singleShot && (!intellectState.active || intellectState.singleShot);
     intellectState.active = true;
-    intellectState.singleShot = singleShot;
     recalibrate(ctx.model, ctx);
     ctx.ui?.notify?.(`Intellect mode enabled${singleShot ? " [One-off Mode]" : ""}.`, "info");
   }
@@ -1022,22 +1034,7 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     intellectState.singleShot = false;
     ctx.ui?.setStatus?.("intellect", undefined);
 
-    if (intellectState.boostActive) {
-      recalibrate(ctx.model, ctx);
-    } else {
-      intellectState.createdPaths.clear();
-      intellectState.sessionReadPaths.clear();
-      pendingCreations.clear();
-      const activeTools = pi.getActiveTools?.() || [];
-      if (activeTools.includes("think")) {
-        pi.setActiveTools(activeTools.filter(t => t !== "think"));
-      }
-      try {
-        pi.setThinkingLevel("off");
-      } catch {}
-    }
-
-    ctx.ui?.notify?.(reason ? `Intellect mode disabled: ${reason}` : "Intellect mode disabled.", "info");
+    releaseCalibration(ctx);
   }
 
   /** Handler for /intellect command: continuous cognitive mode */
@@ -1105,10 +1102,11 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     if (trimmed.toLowerCase() === "on") {
       if (!intellectState.boostActive) {
         intellectState.boostActive = true;
-        intellectState.singleShot = false;
+        boostSingleShot = false;
         recalibrate(ctx.model, ctx);
         ctx.ui?.notify?.("Boost mode enabled: four-stage execution protocol active.", "info");
       } else {
+        boostSingleShot = false;
         ctx.ui?.notify?.("Boost mode is already active.", "info");
       }
       return;
@@ -1118,7 +1116,8 @@ export default function intellectExtension(pi: ExtensionAPI): void {
       if (intellectState.boostActive) {
         intellectState.boostActive = false;
         ctx.ui?.setStatus?.("boost", undefined);
-        if (intellectState.active) recalibrate(ctx.model, ctx);
+        boostSingleShot = false;
+        releaseCalibration(ctx);
         ctx.ui?.notify?.("Boost mode disabled.", "info");
       } else {
         ctx.ui?.notify?.("Boost mode is already disabled.", "info");
@@ -1131,11 +1130,12 @@ export default function intellectExtension(pi: ExtensionAPI): void {
       if (intellectState.boostActive) {
         intellectState.boostActive = false;
         ctx.ui?.setStatus?.("boost", undefined);
-        if (intellectState.active) recalibrate(ctx.model, ctx);
+        boostSingleShot = false;
+        releaseCalibration(ctx);
         ctx.ui?.notify?.("Boost mode disabled.", "info");
       } else {
         intellectState.boostActive = true;
-        intellectState.singleShot = false;
+        boostSingleShot = false;
         recalibrate(ctx.model, ctx);
         ctx.ui?.notify?.("Boost mode enabled: four-stage execution protocol active.", "info");
       }
@@ -1143,8 +1143,10 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     }
 
     // Directed 4-stage orchestration for specific task
+    const wasActive = intellectState.boostActive;
+    const wasSingleShot = boostSingleShot;
+    boostSingleShot = !wasActive || wasSingleShot;
     intellectState.boostActive = true;
-    intellectState.singleShot = true;
     recalibrate(ctx.model, ctx);
     mentalState.lastTask = trimmed;
     ctx.ui?.notify?.(
@@ -1158,7 +1160,10 @@ export default function intellectExtension(pi: ExtensionAPI): void {
       const boostPrompt = buildBoostPrompt(trimmed);
       await pi.sendUserMessage(boostPrompt, options);
     } catch (err) {
-      deactivate(ctx, "Failed to run /boost task.");
+      intellectState.boostActive = wasActive;
+      boostSingleShot = wasSingleShot;
+      ctx.ui?.setStatus?.("boost", wasActive ? "🚀 Boost [Active]" : undefined);
+      releaseCalibration(ctx);
       ctx.ui?.notify?.(
         `Failed to run /boost task: ${err instanceof Error ? err.message : String(err)}`,
         "error"
@@ -1197,15 +1202,13 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     pendingInvestigations.clear();
     pendingCreations.clear();
 
-    if (intellectState.singleShot) {
-      intellectState.singleShot = false;
-      if (intellectState.boostActive) {
-        intellectState.boostActive = false;
-        ctx.ui?.setStatus?.("boost", undefined);
-      } else if (intellectState.active) {
-        deactivate(ctx, "Tarefa pontual concluída.");
-      }
+    if (boostSingleShot) {
+      boostSingleShot = false;
+      intellectState.boostActive = false;
+      ctx.ui?.setStatus?.("boost", undefined);
     }
+    if (intellectState.singleShot) deactivate(ctx, "One-off task completed.");
+    else releaseCalibration(ctx);
   });
 
   // Turn initialization: reset investigation tracker on conversational turn start
