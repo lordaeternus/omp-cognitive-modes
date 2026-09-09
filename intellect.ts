@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -274,6 +275,24 @@ export function isMutatingCommand(command: string): boolean {
   if (!command) return false;
   const cmd = command.trim();
   if (!cmd) return false;
+  // Parse Git command positions, not words inside filenames or quoted arguments.
+  const tokens = cmd.match(/"(?:\\.|[^"\\])*"|'[^']*'|&&|\|\||[;|<>\n]|[^\s;|<>]+/g) || [];
+  if (tokens[0]?.toLowerCase() === "git") {
+    let index = 1;
+    while (tokens[index]?.startsWith("-")) {
+      const option = tokens[index++];
+      if (["-C", "-c", "--git-dir", "--work-tree"].includes(option)) index++;
+    }
+    const subcommand = tokens[index];
+    const boundary = tokens.findIndex((token, position) => position > index && ["&&", "||", ";", "|", "<", ">", "\n"].includes(token));
+    const args = tokens.slice(index + 1, boundary < 0 ? undefined : boundary);
+    const readonly = ["diff", "status", "show", "log", "rev-parse", "ls-files"].includes(subcommand)
+      || (subcommand === "branch" && args.length === 1 && args[0] === "--show-current");
+    if (!readonly || args.some(arg => /^--(?:output|ext-diff|textconv)(?:=|$)/.test(arg))) return true;
+    if (boundary < 0) return false;
+    if ([">", "<"].includes(tokens[boundary])) return true;
+    return isMutatingCommand(tokens.slice(boundary + 1).join(" "));
+  }
 
   // 1. Redirection operators targeting files or variables (> or >> or &> or 1> or 2>)
   // Must NOT match:
@@ -825,6 +844,16 @@ export default function intellectExtension(pi: ExtensionAPI): void {
   const pendingInvestigations = new Map<string, { paths: string[]; isTask: boolean; isShell?: boolean }>();
   const pendingCreations = new Map<string, string>();
 
+  const fileEvidence = new Map<string, { revision: string; tool: string; readAt: number }>();
+  const pendingReads = new Map<string, { paths: string[]; revisions: Map<string, string>; tool: string }>();
+  const fileKey = (value: string, cwd: string): string => {
+    const clean = value.replace(/:(?:raw|img)(?=:|$)/g, "").replace(/:(?:\d[\d,:+\-]*|\-\d+)$/, "");
+    const resolved = path.resolve(cwd, clean);
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  };
+  const revision = (file: string): string | undefined => {
+    try { return createHash("sha256").update(fs.readFileSync(file)).digest("hex"); } catch { return undefined; }
+  };
   /** Register the synthetic structured scratchpad tool */
   pi.registerTool({
     name: "think",
@@ -1198,6 +1227,8 @@ export default function intellectExtension(pi: ExtensionAPI): void {
 
   // Session start: restore mental and operational state
   pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
+    fileEvidence.clear();
+    pendingReads.clear();
     intellectState.investigatedInTurn = false;
     intellectState.turnReadPaths.clear();
     intellectState.createdPaths.clear();
@@ -1283,8 +1314,8 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     if (intellectState.boostActive) {
       sections.push(
         "[STRUCTURED ORCHESTRATION PROTOCOL - BOOST ACTIVE]\n" +
-        "1. Exploration: inspect files with 'read', 'grep', or 'find', or use the 'scout', 'debug-investigator', or 'librarian' subagents.\n" +
-        "2. Planning and decomposition: define hypotheses and atomic steps; use 'think' with non-native models.\n" +
+        "1. Exploration: inspect relevant source with the available reading and code-navigation tools.\n" +
+        "2. Planning and decomposition: define hypotheses and atomic steps; use the scratchpad only when available.\n" +
         "3. Surgical execution: make focused changes; legitimate new-file creation remains available.\n" +
         "4. Verification and audit: validate with automated checks and consult 'code-quality-reviewer' when appropriate."
       );
@@ -1303,9 +1334,9 @@ export default function intellectExtension(pi: ExtensionAPI): void {
     if (intellectState.active && !intellectState.isNative) {
       sections.push(
         "[COGNITIVE DISCIPLINE - INTELLECT ACTIVE]\n" +
-        "1. Structured scratchpad: use the 'think' tool before critical decisions, changes, or execution.\n" +
-        "2. Required investigation: inspect files with 'read', 'grep', or 'find' before proposing changes.\n" +
-        "3. Mutation guardrail: attempts to edit or overwrite files without prior investigation in the turn are blocked.\n" +
+        "1. Structured scratchpad: use it when available before critical decisions, changes, or execution.\n" +
+        "2. Required investigation: inspect relevant source using available tools before proposing changes.\n" +
+        "3. Mutation guardrail: existing files require source evidence matching their current content.\n" +
         "4. Evidence-based reasoning: justify conclusions with concrete evidence found in the code."
       );
     }
@@ -1325,211 +1356,64 @@ export default function intellectExtension(pi: ExtensionAPI): void {
   // Mutability guardrails: intercept tool_call to prevent blind mutations
   pi.on("tool_call", (event: ToolCallEvent, ctx: ExtensionContext): ToolCallEventResult | void => {
     if (!intellectState.active && !intellectState.boostActive) return;
-
-    const toolName = event.toolName;
-
-    // 1. Investigation subagents (task with scout, debug-investigator, librarian)
-    if (isInvestigationTask(toolName, event.input)) {
-      const inputPaths = extractPathsFromTaskInput(event.input);
-      const normalizedPaths = inputPaths.map(normalizePathKey);
-      const callId = (event as any).toolCallId || `${toolName}:${Date.now()}`;
-      pendingInvestigations.set(callId, { paths: normalizedPaths, isTask: true });
+    const name = event.toolName.replace(/^functions\./, "").toLowerCase();
+    const input = event.input as Record<string, unknown>;
+    const target = extractTargetPath(input);
+    const source = typeof input?.input === "string" ? input.input : "";
+    const targets = [...source.matchAll(/^\[([^\]\n]+)#[a-f\d]{4}\]\s*$/gim)].map(match => match[1]);
+    if (target) targets.push(target);
+    const device = name === "write" && target.startsWith("xd://");
+    const codegraph = name.includes("codegraph_explore") || (device && target.endsWith("codegraph_explore"));
+    const reads = ["read", "read_file", "readfile", "get_file", "view_file", "view"].includes(name);
+    if (reads || codegraph) {
+      const paths = reads && target && !/^[a-z]+:\/\//i.test(target) ? [fileKey(target, ctx.cwd)] : [];
+      const revisions = new Map<string, string>();
+      for (const file of paths) { const hash = revision(file); if (hash) revisions.set(file, hash); }
+      pendingReads.set(event.toolCallId, { paths, revisions, tool: event.toolName });
       return;
     }
-
-    const targetPath = extractTargetPath(event.input);
-    const pathKey = targetPath ? normalizePathKey(targetPath) : "";
-
-    // 2. Standard investigation tools (read, view_file, grep, find, ls, glob, list_dir)
-    if (isInvestigationTool(toolName)) {
-      const recorded = pathKey ? [pathKey] : [];
-      const callId = (event as any).toolCallId || `${toolName}:${Date.now()}`;
-      pendingInvestigations.set(callId, { paths: recorded, isTask: false });
-      return;
-    }
-
-    // 3. Check if target path was already read/investigated or created in this turn/session
-    const isPathRecorded = (key: string): boolean => {
-      if (!key) return false;
-      if (
-        intellectState.turnReadPaths.has(key) ||
-        intellectState.createdPaths.has(key) ||
-        intellectState.sessionReadPaths.has(key)
-      ) return true;
-
-      // Handle drive letter variations: e.g. c:/workspace/src/app.ts vs /workspace/src/app.ts
-      if (/^[a-z]:\//.test(key)) {
-        const withoutDrive = key.slice(2);
-        if (
-          intellectState.turnReadPaths.has(withoutDrive) ||
-          intellectState.createdPaths.has(withoutDrive) ||
-          intellectState.sessionReadPaths.has(withoutDrive)
-        ) return true;
-      } else if (key.startsWith("/")) {
-        for (const item of intellectState.turnReadPaths) {
-          if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
+    // Device dispatch is not a filesystem write. Devices enforce their own contracts.
+    if (device) return;
+    if (isFileMutationTool(name)) {
+      const guidance = (pi.getActiveTools?.() || []).includes("read")
+        ? "Read the file with 'read', then retry the edit."
+        : "Inspect the file with an available source-reading tool, then retry the edit.";
+      if (!targets.length) return { block: true, reason: `INTELLECT_TARGET_UNKNOWN: Cannot identify targets of '${event.toolName}'. Use explicit file paths or anchored patch headers. ${guidance}` };
+      for (const targetPath of new Set(targets)) {
+        const file = fileKey(targetPath, ctx.cwd);
+        const current = revision(file);
+        if (!fs.existsSync(file) && isFileWriteTool(name)) continue;
+        const evidence = fileEvidence.get(file);
+        if (!evidence || !current || evidence.revision !== current) {
+          return { block: true, reason: `${evidence ? "INTELLECT_FILE_CONTEXT_STALE" : "INTELLECT_FILE_NOT_READ"}: '${file}'. Known revision: ${evidence?.revision ?? "none"}; current revision: ${current ?? "unavailable"}; last read: ${evidence ? new Date(evidence.readAt).toISOString() : "none"}; source: ${evidence?.tool ?? "none"}. ${guidance}` };
         }
-        for (const item of intellectState.createdPaths) {
-          if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
-        }
-        for (const item of intellectState.sessionReadPaths) {
-          if (/^[a-z]:\//.test(item) && item.slice(2) === key) return true;
-        }
-      }
-
-      if (ctx?.cwd && typeof ctx.cwd === "string") {
-        try {
-          if (path.isAbsolute(targetPath)) {
-            const relKey = normalizePathKey(path.relative(ctx.cwd, targetPath));
-            if (
-              intellectState.turnReadPaths.has(relKey) ||
-              intellectState.createdPaths.has(relKey) ||
-              intellectState.sessionReadPaths.has(relKey)
-            ) return true;
-          } else {
-            const absKey = normalizePathKey(path.resolve(ctx.cwd, targetPath));
-            if (
-              intellectState.turnReadPaths.has(absKey) ||
-              intellectState.createdPaths.has(absKey) ||
-              intellectState.sessionReadPaths.has(absKey)
-            ) return true;
-            if (/^[a-z]:\//.test(absKey)) {
-              const absWithoutDrive = absKey.slice(2);
-              if (
-                intellectState.turnReadPaths.has(absWithoutDrive) ||
-                intellectState.createdPaths.has(absWithoutDrive) ||
-                intellectState.sessionReadPaths.has(absWithoutDrive)
-              ) return true;
-            }
-          }
-        } catch {}
-      }
-      return false;
-    };
-
-    const isTargetInvestigated = pathKey ? isPathRecorded(pathKey) : false;
-
-    if (isTargetInvestigated) {
-      if (pathKey) {
-        intellectState.turnReadPaths.add(pathKey);
       }
       return;
     }
-
-    const lowerToolName = toolName.toLowerCase();
-
-    // 4. File mutation tools (edit, write, patch, multiedit, write_to_file, replace_file_content, etc.)
-    if (isFileMutationTool(toolName)) {
-      // R3: For write tools, distinguish new file creation from overwriting existing file
-      if (isFileWriteTool(toolName) && targetPath) {
-        const isExisting = isExistingFile(String(targetPath), ctx?.cwd, ctx);
-        if (!isExisting) {
-          // Legitimate new file creation allowed (anti-deadlock)
-          const callId = (event as any).toolCallId || `${lowerToolName}:${Date.now()}`;
-          pendingCreations.set(callId, pathKey);
-          return;
-        }
-      }
-
-      return {
-        block: true,
-        reason: `Cognitive guardrail (/intellect): Mutation '${toolName}' blocked for an existing file` +
-                (targetPath ? ` ('${targetPath}')` : "") + `. ` +
-                `No relevant file was investigated or read in this turn. ` +
-                `Use 'read', 'grep', or 'find' to inspect the relevant files, then plan with 'think' before changing them.`
-      };
-    }
-
-    // 5. Shell mutation tools
-    const shellTools = new Set([
-      "bash", "powershell", "pwsh", "cmd", "sh", "exec", "terminal",
-      "shell", "run_command", "exec_command", "execute_command",
-      "command", "run", "terminal_run", "bash_command", "sh_command",
-      "execute", "shell_command", "cli"
-    ]);
-    if (shellTools.has(lowerToolName)) {
-      const cmd = extractCommand(event.input);
-      if (isMutatingCommand(cmd) && !intellectState.investigatedInTurn) {
-        return {
-          block: true,
-          reason: `Cognitive guardrail (/intellect): Mutating shell command blocked ('${cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd}'). ` +
-                  `No relevant file or context was investigated in this turn. ` +
-                  `Inspect the files and environment before applying changes.`
-        };
-      } else if (isInvestigationCommand(cmd)) {
-        const callId = event.toolCallId;
-        pendingInvestigations.set(callId, { paths: [], isTask: false, isShell: true });
-      }
+    const shellTools = ["bash", "powershell", "pwsh", "cmd", "sh", "exec", "terminal", "shell", "run_command", "exec_command", "execute_command", "command", "run", "terminal_run", "bash_command", "sh_command", "execute", "shell_command", "cli"];
+    if (shellTools.includes(name) && isMutatingCommand(extractCommand(input))) {
+      const fresh = [...fileEvidence].some(([file, evidence]) => revision(file) === evidence.revision);
+      if (!fresh) return { block: true, reason: "INTELLECT_SHELL_CONTEXT_MISSING: Inspect relevant source with an available reading tool before a mutating shell command. This is an investigation prerequisite, not user authorization." };
     }
   });
 
   // Listen for tool_result to capture investigated paths from subagents and tools
-  pi.on("tool_result", (event: ToolResultEvent, _ctx: ExtensionContext) => {
-    if (!intellectState.active && !intellectState.boostActive) return;
-
-    const toolName = event.toolName;
-    const lowerToolName = toolName.toLowerCase();
-    const isTask = lowerToolName === "task" ||
-                   lowerToolName === "agent_task" ||
-                   lowerToolName === "subagent" ||
-                   lowerToolName === "delegate" ||
-                   lowerToolName === "run_agent" ||
-                   lowerToolName === "spawn_agent" ||
-                   lowerToolName === "sub_agent";
-    const isInvTool = isInvestigationTool(toolName);
-    const shellTools = new Set([
-      "bash", "powershell", "pwsh", "cmd", "sh", "exec", "terminal",
-      "shell", "run_command", "exec_command", "execute_command",
-      "command", "run", "terminal_run", "bash_command", "sh_command",
-      "execute", "shell_command", "cli"
-    ]);
-    const isShell = shellTools.has(lowerToolName);
-
-    if (event.isError) {
-      const callId = event.toolCallId;
-      let pending = callId ? pendingInvestigations.get(callId) : undefined;
-      if (!pending) {
-        for (const [k, v] of pendingInvestigations.entries()) {
-          if (isTask && v.isTask) {
-            pending = v;
-            pendingInvestigations.delete(k);
-            break;
-          } else if (isShell && v.isShell) {
-            pending = v;
-            pendingInvestigations.delete(k);
-            break;
-          } else if (k.toLowerCase().startsWith(lowerToolName)) {
-            pending = v;
-            pendingInvestigations.delete(k);
-            break;
-          }
-        }
-      } else {
-        pendingInvestigations.delete(callId);
-      }
-
-
-      pendingCreations.delete(callId);
-
-      return;
+  pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
+    const pending = pendingReads.get(event.toolCallId);
+    pendingReads.delete(event.toolCallId);
+    if (!pending || event.isError) return;
+    const text = event.content.filter(item => item.type === "text").map(item => item.text).join("\n");
+    const paths = new Set(pending.paths);
+    // Only source blocks count: a filename mentioned in prose is not evidence.
+    for (const match of text.matchAll(/(?:^|\n)(?:\[([^\]\n]+)#[a-f\d]{4}\]|#{1,6}\s+`?([^`\n]+?)`?)\s*\n(?:```[^\n]*\n)?(?=\s*\d+[\t:])/gim)) {
+      paths.add(fileKey(match[1] || match[2], ctx.cwd));
     }
-
-    const createdPath = pendingCreations.get(event.toolCallId);
-    pendingCreations.delete(event.toolCallId);
-    if (createdPath) {
-      intellectState.createdPaths.add(createdPath);
-      intellectState.turnReadPaths.add(createdPath);
+    for (const file of paths) {
+      const current = revision(file);
+      const before = pending.revisions.get(file);
+      if (!current || (before && before !== current)) continue;
+      fileEvidence.set(file, { revision: current, tool: pending.tool, readAt: Date.now() });
     }
-
-    const pending = pendingInvestigations.get(event.toolCallId);
-    pendingInvestigations.delete(event.toolCallId);
-    if (!pending) return;
-
-    const paths = new Set([...pending.paths, ...extractPathsFromToolResult(event)]);
-    for (const investigatedPath of paths) {
-      intellectState.turnReadPaths.add(normalizePathKey(investigatedPath));
-    }
-    intellectState.investigatedInTurn = true;
   });
 
   // Mental state preservation on compaction

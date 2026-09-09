@@ -99,7 +99,11 @@ The status bar displays both indicators. In this state, Intellect improves the r
 
 ## Safety
 
-The extension applies guardrails against premature changes: existing files must be successfully investigated before they can be modified. Tool and subagent results are correlated before mutations are allowed.
+Existing-file edits and overwrites require a successful source read matching the file's current SHA-256 content. Evidence survives conversational turns but is cleared for a new session; changed files must be read again. Anchored patches check every file header. Read selectors and relative/absolute paths are normalized. Failed reads and files changed during a read do not establish evidence.
+
+Codegraph source blocks with a file heading and numbered source lines count as inspection, including calls dispatched through `write` to its `xd://` device. Filename mentions, search listings, and subagent prose alone do not authorize edits. Block messages identify the file, known/current revisions, last accepted read, source tool, and a stable reason code.
+
+Git inspection commands are classified by subcommand rather than words in filenames. Mutating shell commands require fresh source context. This is a workflow aid, **not a sandbox or authorization system**: arbitrary programs, `eval`, and tool devices enforce their own contracts. The extension does not claim to intercept every possible write. User permission remains separate from technical evidence.
 
 The extension contains no keys, tokens, or credentials.
 
@@ -108,6 +112,7 @@ The extension contains no keys, tokens, or credentials.
 ```bash
 npm install
 npm run typecheck
+node --test intellect.test.mjs
 ```
 
 Both commands live in `intellect.ts` because they share cognitive state, model integration, and mutation guardrails.
